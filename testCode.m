@@ -15,24 +15,53 @@ for iFile = 1:numel(files)
     %reader = BioformatsImage(fullfile(dataDir, 'W131R_highMOPC.nd2'));
 
     %%
-    Inucl = getPlane(reader, 1, 'DAPI', 1);
+   Inucl = getPlane(reader, 1, 'DAPI', 1);
+    
+    IGFP = getPlane(reader, 1, 'EGFP', 1);
 
-    mask = imbinarize(Inucl, 'adaptive', 'sensitivity', 0.005);
+    maskNucl = imbinarize(Inucl, 'adaptive', 'sensitivity', 0.005);
+    maskNucl = imopen(maskNucl, strel('disk', 3));
+    maskNucl = bwareaopen(maskNucl, 50);
 
-    mask = imopen(mask, strel('disk', 3));
-
-    mask = bwareaopen(mask, 50);
-
-    dd = -bwdist(~mask);
-    dd(~mask) = -Inf;
+    dd = -bwdist(~maskNucl);
+    dd(~maskNucl) = -Inf;
     dd = imhmin(dd, 2);
 
     L = watershed(dd);
 
-    mask(L == 0) = false;
-    mask = bwareaopen(mask, 250);
+    maskNucl(L == 0) = false;
+    maskNucl = bwareaopen(maskNucl, 250);
+%         imshowpair(Inucl, mask)
 
-    imshowpair(Inucl, mask)
+
+%     imshowpair(Inucl, maskNucl)
+%%
+    %Cell mask
+    maskCell = imbinarize(IGFP, 'adaptive', 'sensitivity', 0.7);
+    maskCell = imopen(maskCell, strel('diamond', 3));
+    maskCell = bwareaopen(maskCell, 100);
+
+%    maskCell = maskCell(2:(end - 1), 2:(end - 1));
+    maskCell = imclearborder(maskCell);
+
+    ddCell = -bwdist(~maskCell);
+    ddCell(~maskCell) = -Inf;
+    dd = imhmin(dd, 2);
+
+    dd = imimposemin(dd, maskNucl);
+
+    L = watershed(dd);
+    maskCell(L == 0) = false;
+    
+    maskCell = bwareaopen(maskCell, 100);
+    
+    maskCell(maskNucl) = false;
+
+
+    C = imfuse(IGFP, Inucl);
+    showoverlay(C, bwperim(maskCell), 'Color', [1 1 0], 'Opacity', 100);
+
+
     %%
     %Measure cell properties
     Igfp = double(getPlane(reader, 1, 'EGFP', 1));
@@ -44,7 +73,7 @@ for iFile = 1:numel(files)
 
     Icy5 = double(getPlane(reader, 1, 'Cy5', 1));
 
-    cellData = regionprops(mask, Inucl, 'MeanIntensity', 'PixelIdxList');
+    cellData = regionprops(maskCell, Inucl, 'MeanIntensity', 'PixelIdxList');
 
     %Exclude misidentified regions
 
@@ -56,18 +85,25 @@ for iFile = 1:numel(files)
     %Measure correlation between EGFP and TRITC channel
     for iCell = 1:numel(cellData)
 
-        cellData(iCell).pccscore_rfpvgfp = corrcoef(Irfp(cellData(iCell).PixelIdxList), ...
-            Igfp(cellData(iCell).PixelIdxList));
+        cellData(iCell).pccscore_rfpvgfp = pearson(Irfp(cellData(iCell).PixelIdxList), ...
+             Igfp(cellData(iCell).PixelIdxList));
 
-        %     %Randomly permute the vector
-        %     rfpdata = Irfp(cellData(iCell).PixelIdxList);
-        %     rfpdata = rfpdata(randperm(numel(rfpdata)));
-        %
-        %     cellData(iCell).pccnull = corrcoef(Igfp(cellData(iCell).PixelIdxList), ...
-        %         rfpdata);
+        cellData(iCell).pccscore_rfpvcy5 = pearson(Irfp(cellData(iCell).PixelIdxList), ...
+             Icy5(cellData(iCell).PixelIdxList));
 
-        cellData(iCell).pccscore_rfpvcy5 = corrcoef(Irfp(cellData(iCell).PixelIdxList), ...
-            Icy5(cellData(iCell).PixelIdxList));
+
+%         cellData(iCell).pccscore_rfpvgfp = corrcoef(Irfp(cellData(iCell).PixelIdxList), ...
+%             Igfp(cellData(iCell).PixelIdxList));
+% 
+%         %     %Randomly permute the vector
+%         %     rfpdata = Irfp(cellData(iCell).PixelIdxList);
+%         %     rfpdata = rfpdata(randperm(numel(rfpdata)));
+%         %
+%         %     cellData(iCell).pccnull = corrcoef(Igfp(cellData(iCell).PixelIdxList), ...
+%         %         rfpdata);
+% 
+%         cellData(iCell).pccscore_rfpvcy5 = corrcoef(Irfp(cellData(iCell).PixelIdxList), ...
+%             Icy5(cellData(iCell).PixelIdxList));
 
         cellData(iCell).meanTritc = mean(Irfp(cellData(iCell).PixelIdxList));
 
@@ -84,7 +120,9 @@ return
 
 for iF = 1:numel(storeData)
 
-    histogram([storeData(iF).data.pccscore_rfpvcy5], 'Normalization', 'probability')
+    histogram([storeData(iF).data.pccscore_rfpvcy5], ...
+        'BinWidth', 0.05, ...
+        'Normalization', 'probability')
     hold on
 
 end
@@ -97,7 +135,7 @@ ylabel('Normalized counts')
 title('Ch3 v Ch4')
 
 
-
+%%
 
 
 
