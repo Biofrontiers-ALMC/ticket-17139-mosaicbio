@@ -1,11 +1,13 @@
 clearvars
 clc
 
-dataDir = 'D:\Projects\ALMC Tickets\T17139-TobinBrown\data';
+dataDir = 'D:\CU-Projects\mosaic-bio\data';
 
 files = dir(fullfile(dataDir, '*.nd2'));
 
 storeData = struct;
+
+cropPx = 15;
 
 for iFile = 1
 
@@ -13,9 +15,14 @@ for iFile = 1
 
     %%
     Inucl = getPlane(reader, 1, 'DAPI', 1);
-    
     IGFP = getPlane(reader, 1, 'EGFP', 1);
-
+    
+    %Crop the images
+    Inucl = Inucl(cropPx:(size(Inucl, 1) - cropPx), ...
+        cropPx:(size(Inucl, 2) - cropPx));
+    IGFP = IGFP(cropPx:(size(IGFP, 1) - cropPx), ...
+        cropPx:(size(IGFP, 2) - cropPx));
+   
     maskNucl = imbinarize(Inucl, 'adaptive', 'sensitivity', 0.005);
     maskNucl = imopen(maskNucl, strel('disk', 3));
     maskNucl = bwareaopen(maskNucl, 50);

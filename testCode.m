@@ -1,24 +1,27 @@
 clearvars
 clc
 
-dataDir = 'D:\Projects\ALMC Tickets\T17139-TobinBrown\data';
+dataDir = 'D:\CU-Projects\mosaic-bio\data';
 
 files = dir(fullfile(dataDir, '*.nd2'));
 
 storeData = struct;
+cropPx = 15;
 
 for iFile = 1:numel(files)
 
-    reader = BioformatsImage(fullfile(files(iFile).folder, files(iFile).name));
-
-    %reader = BioformatsImage(fullfile(dataDir, 'WT_highMOPC.nd2'));
-    %reader = BioformatsImage(fullfile(dataDir, 'W131R_highMOPC.nd2'));
+ reader = BioformatsImage(fullfile(files(iFile).folder, files(iFile).name));
 
     %%
-   Inucl = getPlane(reader, 1, 'DAPI', 1);
-    
+    Inucl = getPlane(reader, 1, 'DAPI', 1);
     IGFP = getPlane(reader, 1, 'EGFP', 1);
-
+    
+    %Crop the images
+    Inucl = Inucl(cropPx:(size(Inucl, 1) - cropPx), ...
+        cropPx:(size(Inucl, 2) - cropPx));
+    IGFP = IGFP(cropPx:(size(IGFP, 1) - cropPx), ...
+        cropPx:(size(IGFP, 2) - cropPx));
+   
     maskNucl = imbinarize(Inucl, 'adaptive', 'sensitivity', 0.005);
     maskNucl = imopen(maskNucl, strel('disk', 3));
     maskNucl = bwareaopen(maskNucl, 50);
@@ -31,8 +34,6 @@ for iFile = 1:numel(files)
 
     maskNucl(L == 0) = false;
     maskNucl = bwareaopen(maskNucl, 250);
-%         imshowpair(Inucl, mask)
-
 
 %     imshowpair(Inucl, maskNucl)
 %%
@@ -45,22 +46,28 @@ for iFile = 1:numel(files)
     maskCell = imclearborder(maskCell);
 
     ddCell = -bwdist(~maskCell);
-    ddCell(~maskCell) = -Inf;
-    dd = imhmin(dd, 2);
+%     ddCell(~maskCell) = -Inf;
 
-    dd = imimposemin(dd, maskNucl);
-
-    L = watershed(dd);
+    maskNuclReduced = bwmorph(maskNucl, 'shrink', 7);
+    
+    ddCell = imimposemin(ddCell, maskNuclReduced | ~maskCell);
+    ddCell = imhmin(ddCell, 2);
+    
+    L = watershed(ddCell);
     maskCell(L == 0) = false;
     
     maskCell = bwareaopen(maskCell, 100);
     
-    maskCell(maskNucl) = false;
-
-
+    %Remove the nuclei from the masks
+    maskCellLabel = bwlabel(maskCell);
+    maskCellLabel(maskNucl) = 0;
+            
     C = imfuse(IGFP, Inucl);
-    showoverlay(C, bwperim(maskCell), 'Color', [1 1 0], 'Opacity', 100);
-
+    showoverlay(C, maskCellLabel, 'Color', [0 1 1], 'Opacity', 20);
+    
+%     figure(99)
+%     imshow(label2rgb(maskCellLabel))
+%     return
 
     %%
     %Measure cell properties
@@ -73,14 +80,13 @@ for iFile = 1:numel(files)
 
     Icy5 = double(getPlane(reader, 1, 'Cy5', 1));
 
-    cellData = regionprops(maskCell, Inucl, 'MeanIntensity', 'PixelIdxList');
+    cellData = regionprops(maskCellLabel, Inucl, 'MeanIntensity', 'PixelIdxList');
 
     %Exclude misidentified regions
 
     %The main outputs I would like to see are 1) colocalization between
     %(channel 3 and channel 2) and (channel 3 and channel 4), and the total
     %intensity per cell of channel 3.
-
 
     %Measure correlation between EGFP and TRITC channel
     for iCell = 1:numel(cellData)
@@ -114,10 +120,11 @@ for iFile = 1:numel(files)
 
 end
 
-return
+% return
 
 %% Data analysis
 
+figure(1)
 for iF = 1:numel(storeData)
 
     histogram([storeData(iF).data.pccscore_rfpvcy5], ...
@@ -132,7 +139,25 @@ legend({storeData.filename}, 'Interpreter', 'none')
 
 xlabel('Pearson''s correlation coefficient')
 ylabel('Normalized counts')
-title('Ch3 v Ch4')
+title('RFP vs Cy5')
+
+%%
+figure(2)
+for iF = 1:numel(storeData)
+
+    histogram([storeData(iF).data.pccscore_rfpvgfp], ...
+        'BinWidth', 0.05, ...
+        'Normalization', 'probability')
+    hold on
+
+end
+hold off
+
+legend({storeData.filename}, 'Interpreter', 'none')
+
+xlabel('Pearson''s correlation coefficient')
+ylabel('Normalized counts')
+title('RFP vs GFP')
 
 
 %%
