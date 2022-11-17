@@ -9,6 +9,8 @@ storeData = struct;
 
 cropPx = 15;
 
+store
+
 for iFile = 1
 
     reader = BioformatsImage(fullfile(files(iFile).folder, files(iFile).name));
@@ -58,17 +60,18 @@ for iFile = 1
     maskCell = bwareaopen(maskCell, 100);
     
     C = imfuse(IGFP, Inucl);
-    showoverlay(C, maskCell, 'Color', [0 1 1], 'Opacity', 20);
+    Iout = showoverlay(C, maskCell, 'Color', [0 1 1], 'Opacity', 20);
+
+    [~, fn] = fileparts(files(iFile).name);
+
+    imwrite(Iout, [fn, '.tif'], 'Compression', 'none')
     
 %%
 
-    
-
-
 end
 
-
-
+%Hi red TIF files
+%CSV, PCC, Mean Red
 
 
 

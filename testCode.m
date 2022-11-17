@@ -1,7 +1,7 @@
 clearvars
 clc
 
-dataDir = 'D:\CU-Projects\mosaic-bio\data';
+dataDir = 'D:\Projects\ALMC Tickets\T17139-TobinBrown\data';
 
 files = dir(fullfile(dataDir, '*.nd2'));
 
@@ -62,8 +62,15 @@ for iFile = 1:numel(files)
     maskCellLabel = bwlabel(maskCell);
     maskCellLabel(maskNucl) = 0;
             
+    %Get the final cell mask
+    maskCell = maskCellLabel ~= 0;
+
     C = imfuse(IGFP, Inucl);
-    showoverlay(C, maskCellLabel, 'Color', [0 1 1], 'Opacity', 20);
+
+    Iout = showoverlay(C, maskCell, 'Color', [1 1 0], 'Opacity', 50);
+    
+    [~, fn] = fileparts(files(iFile).name);
+    imwrite(Iout, [fn, '.tif'], 'Compression', 'none')
     
 %     figure(99)
 %     imshow(label2rgb(maskCellLabel))
@@ -118,9 +125,21 @@ for iFile = 1:numel(files)
     storeData(iFile).filename = files(iFile).name;
     storeData(iFile).data = cellData;
 
+    %Measure the total correlation between the two channels
+    storeData(iFile).totalCorrelation_rfpvgfp = pearson(Irfp(maskCell) ,...
+        Igfp(maskCell));
+
+    storeData(iFile).totalCorrelation_rfpvcy5 = pearson(Irfp(maskCell) ,...
+        Icy5(maskCell));
+
 end
 
-% return
+%% Export data
+
+%Export data as a CSV
+
+
+
 
 %% Data analysis
 
@@ -162,9 +181,21 @@ title('RFP vs GFP')
 
 %%
 
+%Greate grouping variables
+allPCCscores = [];
+grps = [];
+for ii = 1:numel(storeData)
+    allPCCscores = [allPCCscores, cat(2, storeData(ii).data.pccscore_rfpvgfp)];
+    grps = [grps, ones(1, numel(storeData(ii).data)) * ii];
+
+end
+boxplot(allPCCscores, grps)
+xticklabels({storeData.filename})
+
+[p, tbl, stats] = anova1(allPCCscores, grps, 'off');
+C = multcompare(stats);
 
 
-
-
-
+figure;
+bar([storeData.totalCorrelation_rfpvgfp])
 
