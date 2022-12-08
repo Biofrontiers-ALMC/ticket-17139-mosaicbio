@@ -1,7 +1,7 @@
 clearvars
 clc
 
-dataDir = 'D:\Projects\ALMC Tickets\T17139-TobinBrown\data';
+dataDir = 'D:\CU-Projects\mosaic-bio\data';
 
 files = dir(fullfile(dataDir, '*.nd2'));
 
@@ -137,8 +137,21 @@ end
 %% Export data
 
 %Export data as a CSV
+fid = fopen('testOutput.csv', 'w');
 
+fprintf(fid, 'Filename, PCC (RFP/GFP), PCC (RFP/Cy5), Mean RFP\n');
 
+for iFile = 1:numel(storeData)
+    for iCell = 1:numel(storeData(iFile).data)
+    
+        fprintf(fid, '%s, %.5f, %.5f, %.5f\n', ...
+            storeData(iFile).filename, ...
+            storeData(iFile).data(iCell).pccscore_rfpvgfp, ...
+            storeData(iFile).data(iCell).pccscore_rfpvcy5, ...
+            storeData(iFile).data(iCell).meanTritc);
+    end 
+end
+fclose(fid);
 
 
 %% Data analysis
