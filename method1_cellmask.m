@@ -1,8 +1,8 @@
 clearvars
 clc
 
-%reader = BioformatsImage('../data/W131R_Img1.nd2');
-reader = BioformatsImage('../data/WT_Img.nd2');
+reader = BioformatsImage('../data/W131R_Img1.nd2');
+%reader = BioformatsImage('../data/WT_Img.nd2');
 
 I = getPlane(reader, 1, 'SDC-GFP', 1);
 
